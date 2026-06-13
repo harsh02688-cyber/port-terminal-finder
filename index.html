@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Harsh's Port/Terminal Finder</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            display: none;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        /* Custom scrollbar for autocomplete */
+        #autocompleteList::-webkit-scrollbar {
+            width: 6px;
+        }
+        #autocompleteList::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+            border-radius: 8px;
+        }
+        #autocompleteList::-webkit-scrollbar-thumb {
+            background: #c1c1c1; 
+            border-radius: 8px;
+        }
+        #autocompleteList::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8; 
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div class="max-w-2xl w-full bg-white rounded-2xl shadow-xl overflow-visible">
+        <!-- Header -->
+        <div class="bg-blue-600 p-8 text-white text-center rounded-t-2xl">
+            <div class="flex justify-center mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-blue-100" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+            </div>
+            <h1 class="text-3xl font-bold mb-2">Harsh's Port/Terminal Finder</h1>
+            <p class="text-blue-200">Enter any city or location to find the closest major seaport or rail terminal globally.</p>
+        </div>
+
+        <!-- Search Section -->
+        <div class="p-8">
+            <form id="searchForm" class="flex flex-col sm:flex-row gap-4 mb-6 relative">
+                <select id="facilityType" class="w-full sm:w-auto pl-4 pr-8 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white shadow-sm outline-none cursor-pointer text-gray-700 font-medium">
+                    <option value="port">⚓ Seaport</option>
+                    <option value="rail">🚆 Railway Terminal</option>
+                </select>
+                
+                <div class="relative flex-grow">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                    </div>
+                    <input type="text" id="locationInput" autocomplete="off" required placeholder="e.g., Paris, Tokyo, Chicago..." 
+                        class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors shadow-sm outline-none">
+                    
+                    <!-- Autocomplete Dropdown -->
+                    <ul id="autocompleteList" class="absolute z-50 w-full bg-white border border-gray-200 rounded-xl shadow-2xl mt-2 hidden max-h-64 overflow-y-auto top-full left-0 divide-y divide-gray-100"></ul>
+                </div>
+
+                <button type="submit" 
+                    class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-xl shadow-md transition-colors duration-200 flex items-center justify-center min-w-[140px] z-10 relative">
+                    <span id="btnText">Search</span>
+                    <div id="loader" class="loader ml-2"></div>
+                </button>
+            </form>
+
+            <!-- Error State -->
+            <div id="errorMessage" class="hidden mb-6 p-4 bg-red-50 text-red-700 border border-red-200 rounded-xl text-sm flex items-start">
+                <svg class="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span id="errorText">Location not found. Please try another search.</span>
+            </div>
+
+            <!-- Result State -->
+            <div id="resultCard" class="hidden">
+                <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Results for <span id="displayLocation" class="text-gray-800">...</span></h3>
+                
+                <div class="bg-gray-50 rounded-xl p-6 border border-gray-100 relative overflow-hidden group hover:border-blue-200 transition-colors shadow-sm">
+                    <div class="absolute top-0 right-0 p-4 opacity-10 transform translate-x-4 -translate-y-4 group-hover:scale-110 transition-transform duration-500">
+                        <svg class="w-32 h-32 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M19.9,12.4c-0.2-0.5-0.7-0.9-1.3-0.9h-1.5v-1.1c0-0.6-0.3-1.1-0.8-1.4l-4.5-2.6c-0.5-0.3-1.1-0.3-1.6,0 L5.7,9C5.2,9.3,4.9,9.8,4.9,10.4v1.1H3.4c-0.6,0-1.1,0.4-1.3,0.9L1.4,15.1c-0.2,0.5,0,1.1,0.4,1.4l1.3,1.3v3.7c0,0.8,0.7,1.5,1.5,1.5 h13.8c0.8,0,1.5-0.7,1.5-1.5v-3.7l1.3-1.3c0.4-0.4,0.6-1,0.4-1.4L19.9,12.4z M10.4,8.1l1.6-0.9l1.6,0.9v1.9h-3.2V8.1z M5.5,15.7 l-1.8-1.8l0.5-1.5h15.6l0.5,1.5l-1.8,1.8V20c0-0.1-0.1-0.1-0.1-0.1H5.6c0,0-0.1,0-0.1,0.1V15.7z"/>
+                        </svg>
+                    </div>
+
+                    <div class="relative z-10">
+                        <div class="flex items-center justify-between mb-2 gap-4">
+                            <h2 id="portName" class="text-2xl font-bold text-gray-900 leading-tight">Port Name</h2>
+                            <span id="distanceBadge" class="bg-blue-100 text-blue-800 text-xs font-bold px-3 py-1 rounded-full border border-blue-200 whitespace-nowrap">
+                                45 km away
+                            </span>
+                        </div>
+                        
+                        <p id="portCountry" class="text-gray-600 flex items-center mb-6">
+                            <svg class="h-4 w-4 mr-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Country
+                        </p>
+
+                        <div class="grid grid-cols-2 gap-4 border-t border-gray-200 pt-4">
+                            <div>
+                                <p class="text-xs text-gray-500 uppercase tracking-wider">Coordinates</p>
+                                <p id="portCoords" class="text-sm font-medium text-gray-800 mt-1">0.00, 0.00</p>
+                            </div>
+                            <div class="flex justify-end items-end">
+                                <a id="mapLink" href="#" target="_blank" class="inline-flex items-center text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline">
+                                    View on Map
+                                    <svg class="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                    </svg>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // UI Elements
+        const form = document.getElementById('searchForm');
+        const input = document.getElementById('locationInput');
+        const facilityType = document.getElementById('facilityType');
+        const btnText = document.getElementById('btnText');
+        const loader = document.getElementById('loader');
+        const autocompleteList = document.getElementById('autocompleteList');
+        const resultCard = document.getElementById('resultCard');
+        const errorMessage = document.getElementById('errorMessage');
+        const errorText = document.getElementById('errorText');
+
+        // Result Elements
+        const displayLocation = document.getElementById('displayLocation');
+        const portName = document.getElementById('portName');
+        const distanceBadge = document.getElementById('distanceBadge');
+        const portCountry = document.getElementById('portCountry');
+        const portCoords = document.getElementById('portCoords');
+        const mapLink = document.getElementById('mapLink');
+
+        // Calculate Distance using Haversine formula
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Earth radius in kilometers
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = 
+                Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        let selectedLocation = null;
+        let debounceTimer;
+
+        // Autocomplete Logic
+        input.addEventListener('input', (e) => {
+            const query = e.target.value.trim();
+            selectedLocation = null; // Reset selection on new typing
+            
+            clearTimeout(debounceTimer);
+            
+            if (query.length < 3) {
+                autocompleteList.classList.add('hidden');
+                autocompleteList.innerHTML = '';
+                return;
+            }
+
+            debounceTimer = setTimeout(async () => {
+                try {
+                    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=5`;
+                    const res = await fetch(url, { headers: { 'User-Agent': 'NearestFacilityFinder/1.0' } });
+                    if (!res.ok) throw new Error('API Error');
+                    const data = await res.json();
+                    
+                    autocompleteList.innerHTML = '';
+                    if (data.length > 0) {
+                        data.forEach(item => {
+                            const li = document.createElement('li');
+                            li.className = 'px-4 py-3 hover:bg-blue-50 cursor-pointer flex flex-col transition-colors text-left';
+                            
+                            // Format UX: Primary name bolded, secondary details smaller
+                            const primaryName = item.name || item.display_name.split(',')[0];
+                            const secondaryName = item.display_name.split(',').slice(1).join(',').trim();
+
+                            li.innerHTML = `
+                                <span class="font-medium text-gray-800">${primaryName}</span>
+                                <span class="text-xs text-gray-500 truncate mt-0.5">${secondaryName}</span>
+                            `;
+                            
+                            li.addEventListener('click', () => {
+                                input.value = item.display_name; // Set full name in input
+                                selectedLocation = {
+                                    lat: parseFloat(item.lat),
+                                    lon: parseFloat(item.lon),
+                                    name: primaryName
+                                };
+                                autocompleteList.classList.add('hidden');
+                                // Automatically trigger the search upon selection
+                                form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+                            });
+                            autocompleteList.appendChild(li);
+                        });
+                        autocompleteList.classList.remove('hidden');
+                    } else {
+                        autocompleteList.classList.add('hidden');
+                    }
+                } catch (err) {
+                    console.error("Autocomplete error:", err);
+                }
+            }, 400); // 400ms debounce
+        });
+
+        // Hide autocomplete when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!input.contains(e.target) && !autocompleteList.contains(e.target)) {
+                autocompleteList.classList.add('hidden');
+            }
+        });
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const query = input.value.trim();
+            const selectedType = facilityType.value;
+            if (!query) return;
+
+            // Hide autocomplete list
+            autocompleteList.classList.add('hidden');
+
+            // Reset UI state
+            btnText.style.display = 'none';
+            loader.style.display = 'block';
+            resultCard.classList.add('hidden');
+            errorMessage.classList.add('hidden');
+            input.blur(); // dismiss mobile keyboard
+
+            try {
+                let searchLat, searchLon, formattedLocationName;
+
+                if (selectedLocation && input.value.includes(selectedLocation.name)) {
+                    // Use pre-fetched coordinates from the autocomplete selection
+                    searchLat = selectedLocation.lat;
+                    searchLon = selectedLocation.lon;
+                    formattedLocationName = selectedLocation.name;
+                } else {
+                    // Fallback Geocoding: If user types and hits enter without clicking an autocomplete option
+                    const geocodeUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`;
+                    
+                    const response = await fetch(geocodeUrl, {
+                        headers: { 'User-Agent': 'NearestFacilityFinder/1.0' }
+                    });
+
+                    if (!response.ok) throw new Error('Failed to fetch location data.');
+
+                    const data = await response.json();
+
+                    if (data.length === 0) {
+                        throw new Error('Location not found. Please check spelling and try again.');
+                    }
+
+                    searchLat = parseFloat(data[0].lat);
+                    searchLon = parseFloat(data[0].lon);
+                    formattedLocationName = data[0].display_name.split(',')[0]; 
+                }
+
+                // Step 2: Use Overpass API to query the nearest facilities dynamically
+                // Search radius: 1000km for ports, 300km for rail
+                const radius = selectedType === 'port' ? 1000000 : 300000;
+                let overpassQuery = "";
+                
+                if (selectedType === 'port') {
+                    // Query for ports, harbours, or maritime industrial zones
+                    overpassQuery = `[out:json][timeout:25];
+                    (
+                      nwr["harbour"](around:${radius}, ${searchLat}, ${searchLon});
+                      nwr["seamark:type"="harbour"](around:${radius}, ${searchLat}, ${searchLon});
+                      nwr["landuse"="port"](around:${radius}, ${searchLat}, ${searchLon});
+                    );
+                    out center;`;
+                } else {
+                    // Query for railway stations
+                    overpassQuery = `[out:json][timeout:25];
+                    (
+                      nwr["railway"="station"](around:${radius}, ${searchLat}, ${searchLon});
+                    );
+                    out center;`;
+                }
+
+                const overpassUrl = `https://overpass-api.de/api/interpreter`;
+                const facilityRes = await fetch(overpassUrl, {
+                    method: 'POST',
+                    body: "data=" + encodeURIComponent(overpassQuery),
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+                });
+
+                if (!facilityRes.ok) throw new Error('Failed to fetch facility data from live database.');
+
+                const facilityData = await facilityRes.json();
+                
+                // Filter elements to only those that have a name mapped
+                const elements = facilityData.elements.filter(e => e.tags && e.tags.name);
+
+                if (elements.length === 0) {
+                    const typeName = selectedType === 'port' ? 'seaports' : 'railway terminals';
+                    throw new Error(`No mapped ${typeName} found within ${radius/1000}km of this location.`);
+                }
+
+                // Step 3: Calculate precise distances and find the absolute nearest
+                let nearestFacility = null;
+                let minDistance = Infinity;
+
+                for (const el of elements) {
+                    // Overpass returns lat/lon for nodes, and center.lat/center.lon for complex geometries
+                    const elLat = el.lat || el.center?.lat;
+                    const elLon = el.lon || el.center?.lon;
+                    
+                    if (!elLat || !elLon) continue;
+
+                    const distance = calculateDistance(searchLat, searchLon, elLat, elLon);
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        nearestFacility = {
+                            name: el.tags.name,
+                            lat: elLat,
+                            lon: elLon
+                        };
+                    }
+                }
+
+                if (!nearestFacility) throw new Error("Could not calculate distance for the facilities.");
+
+                // Step 4: Reverse geocode the winning facility to get its exact country name
+                const revUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${nearestFacility.lat}&lon=${nearestFacility.lon}&zoom=10`;
+                const revRes = await fetch(revUrl, { headers: { 'User-Agent': 'NearestFacilityFinder/1.0' } });
+                let countryName = "Local Region";
+                
+                if (revRes.ok) {
+                    const revData = await revRes.json();
+                    if (revData && revData.address && revData.address.country) {
+                        countryName = revData.address.country;
+                    }
+                }
+
+                // Step 5: Display Results
+                displayLocation.textContent = formattedLocationName;
+                portName.textContent = nearestFacility.name;
+                portCountry.innerHTML = `
+                    <svg class="h-4 w-4 mr-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    ${countryName}
+                `;
+                
+                const distanceKm = Math.round(minDistance);
+                distanceBadge.textContent = `${distanceKm.toLocaleString()} km away`;
+                
+                portCoords.textContent = `${nearestFacility.lat.toFixed(4)}, ${nearestFacility.lon.toFixed(4)}`;
+                mapLink.href = `https://www.google.com/maps/search/?api=1&query=${nearestFacility.lat},${nearestFacility.lon}`;
+
+                resultCard.classList.remove('hidden');
+
+            } catch (error) {
+                errorText.textContent = error.message;
+                errorMessage.classList.remove('hidden');
+            } finally {
+                loader.style.display = 'none';
+                btnText.style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>
